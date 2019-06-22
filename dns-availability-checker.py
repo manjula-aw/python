@@ -2,7 +2,6 @@ import socket
 import requests as req
 
 
-inputfilepath='tlds.txt'
 outputfilepath='unregistereddomains.txt'
 
 resp = req.get("https://data.iana.org/TLD/tlds-alpha-by-domain.txt")
