@@ -45,7 +45,7 @@ for message in messages:
         try:
             recipients = str(message.To).strip();
             sender = str(message.Sender).strip();
-            senttime = message.SentOn;
+            senttime = message.SentOn.strftime("%Y-%m-%d %I%M");
 
             if (sender != recipients and not "@gmail.com" in recipients):
                 writer.writerow({'Time': senttime, 'Subject': subject, 'Recipients':recipients });
@@ -72,16 +72,16 @@ for appointmentItem in restrictedItems:
     subject = appointmentItem.Subject;
     print(subject);
 
-    if (not subject.startswith("Canceled:") and not subject.startswith("Accepted:") and not subject.startswith("Declined:")):
-        try:
-            organizer = str(appointmentItem.Organizer).strip();
-            starttime = appointmentItem.Start;
-            writer.writerow({'Time': starttime, 'Subject': subject, 'Recipients':organizer });
-                
-        except com_error as e:
-            writer.writerow({'Time': "<encrypted email>", 'Subject': subject, 'Recipients':"<encrypted email>" });	
-        except:            
-            pass;
+    try:
+        organizer = str(appointmentItem.Organizer).strip();
+        starttime = appointmentItem.Start.strftime("%Y-%m-%d %I%M");
+        writer.writerow({'Time': starttime, 'Subject': subject, 'Recipients':organizer });
+            
+    except com_error as e:
+        writer.writerow({'Time': "<encrypted email>", 'Subject': subject, 'Recipients':"<encrypted email>" });	
+    except:            
+        pass;
 		  
 
 f.close()
+
