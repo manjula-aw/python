@@ -6,6 +6,7 @@ import sys
 import datetime
 import calendar
 import csv
+import json
 from collections import defaultdict
 
 # Pre-requisite: install pywin32 using 'pip install pywin32'
@@ -15,6 +16,15 @@ from collections import defaultdict
 # https://docs.microsoft.com/en-us/office/vba/api/outlook.recipient
 # https://msdn.microsoft.com/en-us/library/office/ff870566%28v=office.14%29.aspx
 
+def holidays():
+    # TODO: find online json/rest api to retrieve holidays for this year.
+    return [];
+
+def firstdayofmonth():
+    firstday = datetime.date.today()
+    while firstday.isoweekday() > 5 or firstday in holidays():
+        firstday += datetime.timedelta(days=1);
+    return firstday.strftime("%Y-%m-%d");
 
 today = datetime.date.today()
 
@@ -34,6 +44,10 @@ restriction_mail="[SentOn] > '{} 12:00 AM' And [SentOn]  < '{} 12:00 AM'".format
 restriction_meeting="[Start] > '{} 12:00 AM' And [End]  < '{} 12:00 AM'".format(firstdayofthismonth, firstdayofnextmonth);
 
 messages=sentmailbox.restrict(restriction_mail);
+
+# TODO: keep a list of people for each project to let script determine which email/meeting is for which project
+#	Recipient list: LastName FirstName; LastName FirstName
+#	Read from projec-data.json 
 
 outputdata = defaultdict(lambda: defaultdict(list));
 
@@ -56,17 +70,13 @@ for message in messages:
                 writer.writerow({'Time': senttime, 'Subject': subject, 'Recipients':recipients });
                 
         except com_error as e:
+            if not closestdate:
+                closestdate = firstdayofmonth();
             outputdata[closestdate]["emails"].append({'Time': "<encrypted email>", 'Subject': subject, 'Recipients':"<encrypted email>" });
             writer.writerow({'Time': "<encrypted email>", 'Subject': subject, 'Recipients':"<encrypted email>" });
         except:            
             pass;
         
-
-
-
-# TODO: keep a list of people for each project to let script determine which email/meeting is for which project
-#	Recipient list: LastName FirstName; LastName FirstName
-#	Read from projec-data.json 
 
 print()
 writer.writeheader();
@@ -89,6 +99,8 @@ for appointmentItem in restrictedItems:
         writer.writerow({'Time': starttime, 'Subject': subject, 'Recipients':organizer });
             
     except com_error as e:
+        if not closestdate:
+            closestdate = firstdayofmonth();
         outputdata[closestdate]["meetings"].append({'Time': "<encrypted email>", 'Subject': subject, 'Recipients':"<encrypted email>" });
         writer.writerow({'Time': "<encrypted email>", 'Subject': subject, 'Recipients':"<encrypted email>" });	
     except:            
@@ -97,8 +109,6 @@ for appointmentItem in restrictedItems:
 
 f.close()
 
-# TODO: organize data by week (both sent emails and outlook meetings togethere.)
-# TODO order calendar items by actual event date
-for i, va in outputdata.items():
+for i in sorted (outputdata):
     print(i);
-    print(va);
+    print(json.dumps(outputdata[i], indent=4, sort_keys=True));
