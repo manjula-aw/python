@@ -1,3 +1,4 @@
+# POC to learn calling online REST APIs
 import requests as req
 import json
 from collections import defaultdict
