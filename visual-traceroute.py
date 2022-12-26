@@ -7,18 +7,33 @@ import folium
 from folium.vector_layers import PolyLine
 import webbrowser
 import branca
+from math import atan
+
+
+target_host = "example.com"
 
 # GeoLiteCity database file URL
 url = "https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-City.mmdb"
 destination_path = "GeoLite2-City.mmdb"
 
-
-
-
-target_host = "google.com"
 ipdetails_of_the_route = []
 legend_html_pre = '''
 {% macro html(this, kwargs) %}
+<div style="position: fixed;
+text-align: center;
+top:10px;
+left: 50%;
+transform: translate(-50%, 0);
+z-index:9999;
+font-size:16px;
+font-weight: bold;
+margin:20px;
+padding:10px;
+border: 1px solid black;
+background-color:#ffffff;
+opacity:0.7;">
+Traceroute to example.com
+</div>
 <div style="
     position: fixed; 
     top: 50px;
@@ -26,7 +41,7 @@ legend_html_pre = '''
     z-index:9999;
     font-size:12px;
     ">
-    <table style="background-color:#ffffff;opacity:0.7;border-collapse:collapse;border:1px solid;margin:20px;">
+    <table style="background-color:#ffffff;opacity:0.7;border-collapse:collapse;border:1px solid;margin:20px;padding:10px">
     '''
 
 legend_html_post = '''
@@ -34,8 +49,22 @@ legend_html_post = '''
     </div>
     {% endmacro %}
     '''
-legend_html_mid = '<tr style="color:#000000;margin-left:20px;margin-right:20px;"><th>&emsp;Current Hop#</th><th>&emsp;IP Address</th><th>&emsp;Country Name</th></tr>'
+legend_html_mid = '<tr style="color:#000000;margin-left:20px;margin-right:20px;padding:10px"><th>&emsp;Current Hop#</th><th>&emsp;IP Address</th><th>&emsp;Country Name</th></tr>'
 
+##title = '''
+##{% macro html(this, kwargs) %}
+##<div style="
+##    position: relative;
+##    text-align: center;
+##    top: 50px;
+##    z-index:9999;
+##    font-size:16px;
+##    background-color:#ffffff;opacity:0.7;border:1px solid
+##    ">
+##    Traceroute to example.com
+##    </div>
+##{% endmacro %}
+##'''
 
 def traceroute(host):
     # Set the maximum number of hops to 30
@@ -85,11 +114,11 @@ def geoipdetails(ip, current_hop):
         reader = geoip2.database.Reader(destination_path)
         location = reader.city(ip)
         ipdetails_of_the_route.append({"Country":location.country.name,"Latitude":location.location.latitude,"Longitude":location.location.longitude,"IP":ip})
-        legend_html_mid = legend_html_mid + '<tr style="color:#000000;margin-left:20px;margin-right:20px;"><td>&emsp;' + str(current_hop) + '</td><td>&emsp;' + ip + '</td><td>&emsp;' + location.country.name + '</td></tr>'
+        legend_html_mid = legend_html_mid + '<tr style="color:#000000;margin:5px;padding:5px"><td>&emsp;' + str(current_hop) + '</td><td>&emsp;' + ip + '</td><td>&emsp;' + location.country.name + '</td></tr>'
         
     else:
         # Private IP address
-        legend_html_mid = legend_html_mid + '<tr style="color:#000000;margin-left:20px;margin-right:20px;"><td>&emsp;' + str(current_hop) + '</td><td>&emsp;' + ip + '</td><td>&emsp;Private IP</td></tr>'
+        legend_html_mid = legend_html_mid + '<tr style="color:#000000;margin:5px;padding:5px"><td>&emsp;' + str(current_hop) + '</td><td>&emsp;' + ip + '</td><td>&emsp;Private IP</td></tr>'
                 
         if len(ipdetails_of_the_route) > 0:
             last_ip_details = ipdetails_of_the_route[-1]
@@ -98,7 +127,59 @@ def geoipdetails(ip, current_hop):
             
         ipdetails_of_the_route.append({"Country":"Private IP","Latitude":last_ip_details["Latitude"],"Longitude":last_ip_details["Longitude"],"IP":ip})
 
-    
+def calculate_heading(lat1, lon1, lat2, lon2):
+    lat1 = math.radians(lat1)
+    lon1 = math.radians(lon1)
+    lat2 = math.radians(lat2)
+    lon2 = math.radians(lon2)
+    y = math.sin(lon2 - lon1) * math.cos(lat2)
+    x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(lon2 - lon1)
+    heading = math.atan2(y, x)
+    heading = math.degrees(heading)
+    heading = (heading + 360) % 360
+    return heading
+
+
+def arrow_points_calculate(ini_lat, ini_long, heading):
+    lenght_scale = 1.2
+    sides_scale = 2.5
+    sides_angle = 25
+
+    latA = ini_lat
+    longA = ini_long
+
+    latB = lenght_scale * math.cos(math.radians(heading)) + latA
+    longB = lenght_scale * math.sin(math.radians(heading)) + longA
+
+    latC = sides_scale * math.cos(math.radians(heading + 180 - sides_angle)) + latB
+    longC = sides_scale * math.sin(math.radians(heading + 180 - sides_angle)) + longB
+
+    latD = sides_scale * math.cos(math.radians(heading + 180 + sides_angle)) + latB
+    longD = sides_scale * math.sin(math.radians(heading + 180 + sides_angle)) + longB
+
+    pointA = (latA, longA)
+    pointB = (latB, longB)
+    pointC = (latC, longC)
+    pointD = (latD, longD)
+
+    point = [pointA, pointB, pointC, pointD, pointB]
+    return point
+
+def calculate_midpoint(lat1, lon1, lat2, lon2):
+    lat1 = math.radians(lat1)
+    lon1 = math.radians(lon1)
+    lat2 = math.radians(lat2)
+    lon2 = math.radians(lon2)
+    lon_d = lon2 - lon1
+    Bx = math.cos(lat2) * math.cos(lon_d)
+    By = math.cos(lat2) * math.sin(lon_d)
+    lat3 = math.atan2(math.sin(lat1) + math.sin(lat2), math.sqrt((math.cos(lat1) + Bx) * (math.cos(lat1) + Bx) + By * By))
+    lon3 = lon1 + math.atan2(By, math.cos(lat1) + Bx)
+    lat3 = math.degrees(lat3)
+    lon3 = math.degrees(lon3)
+    return (lat3, lon3)
+
+
 # Download the GeoLiteCity database, only if it does not exists or more than 1 day old
 if not os.path.exists(destination_path) or (time.time() - os.path.getmtime(destination_path) > 86400):
     print("Downloading GeoLiteCity database file...")
@@ -133,14 +214,52 @@ for ip_location in ipdetails_of_the_route:
         else:
             PolyLine([[prev_ip_latitude, prev_ip_longitude], [current_ip_latitude, current_ip_longitude]], color='red', weight=2, opacity=1, arrow_style='triangle', arrow_size=10).add_to(m)
 
+            latitude_difference = current_ip_latitude - prev_ip_latitude
+            longitude_difference = current_ip_longitude - prev_ip_longitude
+            if longitude_difference != 0:
+                arrow_loc_lat, arrow_loc_lon = calculate_midpoint(prev_ip_latitude, prev_ip_longitude, current_ip_latitude, current_ip_longitude)
+##                arrow_loc_lat = current_ip_latitude
+##                arrow_loc_lon = 0
+##                if current_ip_latitude > prev_ip_latitude:
+##                    arrow_loc_lat = current_ip_latitude - latitude_difference/2
+##                else:
+##                    arrow_loc_lat = prev_ip_latitude - latitude_difference/2
+##                
+##                if current_ip_longitude > prev_ip_longitude:
+##                    arrow_loc_lon = current_ip_longitude - longitude_difference/2
+##                else:
+##                    arrow_loc_lon = prev_ip_longitude - longitude_difference/2
+                
+                rotate = 90*atan(latitude_difference/longitude_difference)
+                rotate = atan2(sin(longitude_difference)*cos(current_ip_latitude),cos(prev_ip_latitude)*sin(current_ip_latitude)-sin(prev_ip_latitude)*cos(current_ip_latitude)
+                                *cos(longitude_difference))
+
+                folium.RegularPolygonMarker(location=(arrow_loc_lat, arrow_loc_lon), fill_color='red', number_of_sides=3, radius=4, rotation=rotate, fill=True, color='red').add_to(m)
+                print("prev_ip_latitude:" + str(prev_ip_latitude))
+                print("current_ip_latitude:" + str(current_ip_latitude))
+                print("arrow_loc_lat:" + str(arrow_loc_lat))
+                print("prev_ip_longitude:" + str(prev_ip_longitude))
+                print("current_ip_longitude:" + str(current_ip_longitude))
+                print("arrow_loc_lon:" + str(arrow_loc_lon))
+                print("rotate:" + str(rotate))
+##                heading = calculate_heading(prev_ip_latitude, prev_ip_longitude, current_ip_latitude, current_ip_longitude)
+##                points = arrow_points_calculate(current_ip_latitude, current_ip_longitude, heading)
+##                print(points)
+##                folium.PolyLine(locations=points, color="red").add_to(m)
+
 
 
 # Add traceroute hops as a legend to the map
 legend_html = legend_html_pre + legend_html_mid + legend_html_post
 legend = branca.element.MacroElement()
 legend._template = branca.element.Template(legend_html)
+
+##title_box = branca.element.MacroElement()
+##title_box._template = branca.element.Template(title_box)
+
 folium.LayerControl().add_to(m)
 m.get_root().add_child(legend)
+##m.get_root().add_child(title_box)
 
 # Display the map
 f.save("map.html")
